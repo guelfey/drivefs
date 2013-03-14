@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"github.com/hanwen/go-fuse/fuse"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -13,6 +14,7 @@ type dirNode struct {
 	modTime time.Time
 	name    string
 	fuse.DefaultFsNode
+	sync.Mutex
 }
 
 func newDirNode(file *driveFile) *dirNode {
@@ -74,4 +76,35 @@ func (n *dirNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context)
 
 func (n *dirNode) Name() string {
 	return n.name
+}
+
+func (n *dirNode) Unlink(name string, context *fuse.Context) fuse.Status {
+	n.Lock()
+	defer n.Unlock()
+	if context.Uid != fs.uid || n.mode|0200 == 0 {
+		return fuse.EACCES
+	}
+	cinode := n.Inode().Children()[name]
+	if cinode == nil {
+		return fuse.ENOENT
+	}
+	cnode := cinode.FsNode()
+	switch child := cnode.(type) {
+	case (*docDirNode):
+		return fuse.EPERM
+	case (*dirNode):
+		return fuse.EPERM
+	case (*fileNode):
+		if child.mode|0200 == 0 {
+			return fuse.EPERM
+		}
+		log.Println("deleting", child.id)
+		err := srv.Files.Delete(child.id).Do()
+		if err != nil {
+			log.Print(err)
+			return fuse.EIO
+		}
+		delete(n.Inode().Children(), name)
+	}
+	return fuse.OK
 }

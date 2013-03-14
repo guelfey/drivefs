@@ -27,6 +27,7 @@ func newFileNode(file *driveFile) *fileNode {
 
 	n := new(fileNode)
 	_ = fs.root.Inode().New(false, n)
+	n.id = file.Id
 	n.name = file.Title
 	n.size = uint64(file.FileSize)
 	n.mode = fuse.S_IFREG | 0400
