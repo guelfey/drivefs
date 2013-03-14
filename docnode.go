@@ -118,7 +118,6 @@ func (f *docFile) Read(dest []byte, off int64) (fuse.ReadResult, fuse.Status) {
 		n := copy(dest, f.node.data[off:])
 		return &fuse.ReadResultData{dest[:n]}, fuse.OK
 	}
-	log.Println("returned EOF")
 	return &fuse.ReadResultData{[]byte{}}, fuse.OK
 }
 

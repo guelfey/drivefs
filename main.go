@@ -97,6 +97,5 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	state.Debug = true
 	state.Loop()
 }

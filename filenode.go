@@ -110,16 +110,13 @@ func (f *file) Read(dest []byte, off int64) (fuse.ReadResult, fuse.Status) {
 					return nil, fuse.EIO
 				}
 			}
-			log.Println("read", n, "bytes")
 			f.node.data = append(f.node.data, newData[:n]...)
 		}
 	}
 	if off < int64(len(f.node.data)) {
 		copy(dest, f.node.data[off:])
-		log.Println("returning", int64(len(f.node.data))-off, "bytes")
 		return &fuse.ReadResultData{dest[:int64(len(f.node.data))-off]}, fuse.OK
 	}
-	log.Println("returned EOF")
 	return &fuse.ReadResultData{[]byte{}}, fuse.OK
 }
 
