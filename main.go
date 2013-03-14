@@ -8,7 +8,9 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 	"log"
 	"os"
+	"os/signal"
 	"path"
+	"syscall"
 )
 
 var oauthConf = &oauth.Config{
@@ -107,5 +109,11 @@ func main() {
 	if err != nil {
 		log.Fatalln("Failed to mount file system:", err)
 	}
+	c := make(chan os.Signal)
+	signal.Notify(c, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		<-c
+		state.Unmount()
+	}()
 	state.Loop()
 }
