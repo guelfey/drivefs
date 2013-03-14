@@ -64,7 +64,7 @@ func (n *fileNode) Name() string {
 func (n *fileNode) Open(flags uint32, context *fuse.Context) (fuse.File, fuse.Status) {
 	n.Lock()
 	defer n.Unlock()
-	if context.Uid != fs.uid || (flags|fuse.O_ANYWRITE != 0 && n.mode|0200 == 0) {
+	if context.Uid != fs.uid || (flags&fuse.O_ANYWRITE != 0 && n.mode&0200 == 0) {
 		return nil, fuse.EPERM
 	}
 	f := new(file)

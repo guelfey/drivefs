@@ -65,7 +65,7 @@ func (n *docNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context)
 func (n *docNode) Open(flags uint32, context *fuse.Context) (fuse.File, fuse.Status) {
 	n.Lock()
 	defer n.Unlock()
-	if context.Uid != fs.uid || flags|fuse.O_ANYWRITE != 0 {
+	if context.Uid != fs.uid || flags&fuse.O_ANYWRITE != 0 {
 		return nil, fuse.EPERM
 	}
 	f := new(docFile)
