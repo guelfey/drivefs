@@ -25,7 +25,12 @@ var (
 	transport oauth.Transport
 )
 
-func getCacheFile() string {
+var (
+	doInit    = flag.Bool("init", false, "retrieve a new token")
+	tokenFile = flag.String("tokenfile", getTokenFile(), "path to the token file")
+)
+
+func getTokenFile() string {
 	dataHome := os.Getenv("XDG_DATA_HOME")
 	if dataHome == "" {
 		home := os.Getenv("HOME")
@@ -39,11 +44,10 @@ func getCacheFile() string {
 }
 
 func connect() {
-	cacheFile := getCacheFile()
-	cache := oauth.CacheFile(cacheFile)
+	cache := oauth.CacheFile(*tokenFile)
 	tok, err := cache.Token()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, "Failed to read token:", err)
 		fmt.Fprintln(os.Stderr, "Did you run drivefs -init?")
 		os.Exit(1)
 	} else {
@@ -58,13 +62,12 @@ func connect() {
 
 func getToken() {
 	var code string
-	cacheFile := getCacheFile()
-	if _, err := os.Stat(path.Dir(cacheFile)); os.IsNotExist(err) {
-		if err = os.MkdirAll(path.Dir(cacheFile), 0755); err != nil {
+	if _, err := os.Stat(path.Dir(*tokenFile)); os.IsNotExist(err) {
+		if err = os.MkdirAll(path.Dir(*tokenFile), 0755); err != nil {
 			log.Fatalln("Failed to create cache directory:", err)
 		}
 	}
-	cache := oauth.CacheFile(cacheFile)
+	cache := oauth.CacheFile(*tokenFile)
 	url := transport.AuthCodeURL("")
 	fmt.Println("Visit this URL, log in with your google account and enter the authorization code here:")
 	fmt.Println(url)
@@ -79,23 +82,28 @@ func getToken() {
 	}
 }
 
+func usage() {
+	fmt.Fprintln(os.Stderr, "Usage: drivefs [ options ... ] mountpoint")
+	flag.PrintDefaults()
+	os.Exit(1)
+}
+
 func main() {
 	transport.Config = oauthConf
-	doInit := flag.Bool("init", false, "Get the oauth token")
+	flag.Usage = usage
 	flag.Parse()
 	if *doInit {
 		getToken()
 		return
 	}
 	if flag.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, "Usage: drivefs MOUNTPOINT")
-		os.Exit(1)
+		usage()
 	}
 	connect()
 	fs.root = &dirNode{}
 	state, _, err := fuse.MountNodeFileSystem(flag.Arg(0), &fs, nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalln("Failed to mount file system:", err)
 	}
 	state.Loop()
 }
