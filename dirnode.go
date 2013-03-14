@@ -4,7 +4,6 @@ import (
 	"container/list"
 	"github.com/hanwen/go-fuse/fuse"
 	"log"
-	"os"
 	"time"
 )
 
@@ -67,8 +66,8 @@ func (n *dirNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context)
 		return fuse.ENOENT
 	}
 	out.Mtime = uint64(n.modTime.Unix())
-	out.Owner.Uid = uint32(os.Getuid())
-	out.Owner.Gid = uint32(os.Getgid())
+	out.Owner.Uid = fs.uid
+	out.Owner.Gid = fs.gid
 	out.Mode = n.mode
 	return fuse.OK
 }

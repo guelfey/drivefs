@@ -4,7 +4,6 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 	"io"
 	"log"
-	"os"
 	"sync"
 	"time"
 )
@@ -51,8 +50,8 @@ func (n *fileNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context
 	}
 	out.Size = n.size
 	out.Mtime = uint64(n.modTime.Unix())
-	out.Owner.Uid = uint32(os.Getuid())
-	out.Owner.Gid = uint32(os.Getgid())
+	out.Owner.Uid = fs.uid
+	out.Owner.Gid = fs.gid
 	out.Mode = n.mode
 	return fuse.OK
 }
@@ -64,6 +63,9 @@ func (n *fileNode) Name() string {
 func (n *fileNode) Open(flags uint32, context *fuse.Context) (fuse.File, fuse.Status) {
 	n.Lock()
 	defer n.Unlock()
+	if context.Uid != fs.uid || (flags|fuse.O_ANYWRITE != 0 && n.mode|0200 == 0) {
+		return nil, fuse.EPERM
+	}
 	f := new(file)
 	f.node = n
 	n.refcount++

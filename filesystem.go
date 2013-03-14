@@ -8,6 +8,8 @@ import (
 
 type Filesystem struct {
 	root *dirNode
+	uid  uint32
+	gid  uint32
 }
 
 func (fs *Filesystem) OnMount(conn *fuse.FileSystemConnector) {

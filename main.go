@@ -101,6 +101,8 @@ func main() {
 	}
 	connect()
 	fs.root = &dirNode{}
+	fs.uid = uint32(os.Getuid())
+	fs.gid = uint32(os.Getgid())
 	state, _, err := fuse.MountNodeFileSystem(flag.Arg(0), &fs, nil)
 	if err != nil {
 		log.Fatalln("Failed to mount file system:", err)

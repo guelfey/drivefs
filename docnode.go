@@ -55,8 +55,8 @@ func (n *docNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context)
 		n.hasSize = true
 	}
 	out.Mtime = uint64(n.modTime.Unix())
-	out.Owner.Uid = uint32(os.Getuid())
-	out.Owner.Gid = uint32(os.Getgid())
+	out.Owner.Uid = fs.uid
+	out.Owner.Gid = fs.gid
 	out.Mode = n.mode
 	out.Size = n.size
 	return fuse.OK
@@ -65,6 +65,9 @@ func (n *docNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context)
 func (n *docNode) Open(flags uint32, context *fuse.Context) (fuse.File, fuse.Status) {
 	n.Lock()
 	defer n.Unlock()
+	if context.Uid != fs.uid || flags|fuse.O_ANYWRITE != 0 {
+		return nil, fuse.EPERM
+	}
 	f := new(docFile)
 	f.node = n
 	n.refcount++
