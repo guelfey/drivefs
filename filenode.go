@@ -114,8 +114,8 @@ func (f *file) Read(dest []byte, off int64) (fuse.ReadResult, fuse.Status) {
 		}
 	}
 	if off < int64(len(f.node.data)) {
-		copy(dest, f.node.data[off:])
-		return &fuse.ReadResultData{dest[:int64(len(f.node.data))-off]}, fuse.OK
+		n := copy(dest, f.node.data[off:])
+		return &fuse.ReadResultData{dest[:n]}, fuse.OK
 	}
 	return &fuse.ReadResultData{[]byte{}}, fuse.OK
 }
