@@ -81,7 +81,7 @@ func (n *dirNode) Name() string {
 func (n *dirNode) Unlink(name string, context *fuse.Context) fuse.Status {
 	n.Lock()
 	defer n.Unlock()
-	if context.Uid != fs.uid || n.mode|0200 == 0 {
+	if context.Uid != fs.uid || n.mode&0200 == 0 {
 		return fuse.EACCES
 	}
 	cinode := n.Inode().Children()[name]
@@ -91,14 +91,15 @@ func (n *dirNode) Unlink(name string, context *fuse.Context) fuse.Status {
 	cnode := cinode.FsNode()
 	switch child := cnode.(type) {
 	case (*docDirNode):
+		// XXX: POSIX says that EPERM should be returned, but Linux returns
+		// EISDIR according to unlink(2). What to do?
 		return fuse.EPERM
 	case (*dirNode):
 		return fuse.EPERM
 	case (*fileNode):
-		if child.mode|0200 == 0 {
+		if child.mode&0200 == 0 {
 			return fuse.EPERM
 		}
-		log.Println("deleting", child.id)
 		err := srv.Files.Delete(child.id).Do()
 		if err != nil {
 			log.Print(err)
