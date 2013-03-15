@@ -110,11 +110,13 @@ func main() {
 	if err != nil {
 		log.Fatalln("Failed to mount file system:", err)
 	}
-	c := make(chan os.Signal)
+	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT)
 	go func() {
-		<-c
-		state.Unmount()
+		for {
+			<-c
+			state.Unmount()
+		}
 	}()
 	state.Debug = *debug
 	state.Loop()
