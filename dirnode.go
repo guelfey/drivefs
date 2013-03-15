@@ -5,6 +5,7 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 	"log"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -76,6 +77,43 @@ func (n *dirNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context)
 
 func (n *dirNode) Name() string {
 	return n.name
+}
+
+func (n *dirNode) Rmdir(name string, context *fuse.Context) fuse.Status {
+	n.Lock()
+	defer n.Unlock()
+	if context.Uid != fs.uid || n.mode&0200 == 0 {
+		return fuse.EACCES
+	}
+	cinode := n.Inode().Children()[name]
+	if cinode == nil {
+		return fuse.ENOENT
+	}
+	switch child := cinode.FsNode().(type) {
+	case (*docDirNode):
+		// TODO
+		return fuse.ENOSYS
+	case (*dirNode):
+		if child.mode&0200 == 0 {
+			return fuse.EPERM
+		}
+		child.Lock()
+		defer child.Unlock()
+		if len(child.Inode().Children()) != 0 {
+			return fuse.Status(syscall.ENOTEMPTY)
+		}
+		err := srv.Files.Delete(child.id).Do()
+		if err != nil {
+			log.Print(err)
+			return fuse.EIO
+		}
+		delete(n.Inode().Children(), name)
+	case (*fileNode):
+		return fuse.ENOTDIR
+	default:
+		return fuse.EINVAL
+	}
+	return fuse.OK
 }
 
 func (n *dirNode) Unlink(name string, context *fuse.Context) fuse.Status {

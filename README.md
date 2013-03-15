@@ -135,7 +135,7 @@ with `fusermount -u MOUNTPOINT`.
 	<tr>
 		<td>Rmdir</td>
 		<td>-</td>
-		<td>No</td>
+		<td>Yes</td>
 		<td>-</td>
 		<td>No</td>
 	</tr>
