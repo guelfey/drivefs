@@ -100,10 +100,16 @@ func (n *dirNode) Unlink(name string, context *fuse.Context) fuse.Status {
 		if child.mode&0200 == 0 {
 			return fuse.EPERM
 		}
-		err := srv.Files.Delete(child.id).Do()
-		if err != nil {
-			log.Print(err)
-			return fuse.EIO
+		child.Lock()
+		defer child.Unlock()
+		if child.refcount == 0 {
+			err := srv.Files.Delete(child.id).Do()
+			if err != nil {
+				log.Print(err)
+				return fuse.EIO
+			}
+		} else {
+			child.toDelete = true
 		}
 		delete(n.Inode().Children(), name)
 	}

@@ -18,6 +18,7 @@ type fileNode struct {
 	reader   io.ReadCloser
 	refcount int
 	size     uint64
+	toDelete bool
 	fuse.DefaultFsNode
 	sync.Mutex
 }
@@ -133,5 +134,11 @@ func (f *file) Release() {
 			f.node.reader = nil
 		}
 		f.node.data = nil
+		if f.node.toDelete {
+			err := srv.Files.Delete(f.node.id).Do()
+			if err != nil {
+				log.Print(err)
+			}
+		}
 	}
 }
