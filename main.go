@@ -28,6 +28,7 @@ var (
 )
 
 var (
+	debug     = flag.Bool("debug", false, "print FUSE debugging output")
 	doInit    = flag.Bool("init", false, "retrieve a new token")
 	tokenFile = flag.String("tokenfile", getTokenFile(), "path to the token file")
 )
@@ -115,5 +116,6 @@ func main() {
 		<-c
 		state.Unmount()
 	}()
+	state.Debug = *debug
 	state.Loop()
 }
