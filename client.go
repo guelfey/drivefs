@@ -3,6 +3,7 @@ package main
 import (
 	"code.google.com/p/google-api-go-client/drive/v2"
 	"encoding/json"
+	"errors"
 	"net/http"
 )
 
@@ -35,6 +36,9 @@ func getRoot() (root *driveFile, err error) {
 		return
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return nil, errors.New(resp.Status)
+	}
 	dec := json.NewDecoder(resp.Body)
 	root = new(driveFile)
 	err = dec.Decode(root)
@@ -52,6 +56,9 @@ func listFiles() (list driveFileList, err error) {
 		return
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return driveFileList{}, errors.New(resp.Status)
+	}
 	dec := json.NewDecoder(resp.Body)
 	err = dec.Decode(&list)
 	return

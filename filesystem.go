@@ -15,11 +15,11 @@ type Filesystem struct {
 func (fs *Filesystem) OnMount(conn *fuse.FileSystemConnector) {
 	rootFile, err := getRoot()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to get root folder metadata:", err)
 	}
 	list, err := listFiles()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to list files:", err)
 	}
 	root := newDirNode(rootFile)
 	fs.root.id = root.id
