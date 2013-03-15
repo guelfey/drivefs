@@ -107,7 +107,7 @@ func (n *dirNode) Rmdir(name string, context *fuse.Context) fuse.Status {
 			log.Print(err)
 			return fuse.EIO
 		}
-		delete(n.Inode().Children(), name)
+		n.Inode().RmChild(name)
 	case (*fileNode):
 		return fuse.ENOTDIR
 	default:
@@ -149,7 +149,7 @@ func (n *dirNode) Unlink(name string, context *fuse.Context) fuse.Status {
 		} else {
 			child.toDelete = true
 		}
-		delete(n.Inode().Children(), name)
+		n.Inode().RmChild(name)
 	}
 	return fuse.OK
 }
