@@ -137,7 +137,7 @@ with `fusermount -u MOUNTPOINT`.
 		<td>-</td>
 		<td>Yes</td>
 		<td>-</td>
-		<td>No</td>
+		<td>Yes</td>
 	</tr>
 	<tr>
 		<td>SetXAttr</td>

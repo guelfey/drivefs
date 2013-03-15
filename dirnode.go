@@ -91,8 +91,15 @@ func (n *dirNode) Rmdir(name string, context *fuse.Context) fuse.Status {
 	}
 	switch child := cinode.FsNode().(type) {
 	case (*docDirNode):
-		// TODO
-		return fuse.ENOSYS
+		if child.mode&0200 == 0 {
+			return fuse.EPERM
+		}
+		err := srv.Files.Delete(child.id).Do()
+		if err != nil {
+			log.Print(err)
+			return fuse.EIO
+		}
+		n.Inode().RmChild(name)
 	case (*dirNode):
 		if child.mode&0200 == 0 {
 			return fuse.EPERM

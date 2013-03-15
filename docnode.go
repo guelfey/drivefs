@@ -152,6 +152,9 @@ func newDocDirNode(file *driveFile) *docDirNode {
 		log.Println(file.Title, err)
 	}
 	n := &docDirNode{id: file.Id, modTime: t, mode: fuse.S_IFDIR | 0500, name: file.Title}
+	if file.Editable {
+		n.mode |= 0200
+	}
 	_ = fs.root.Inode().New(true, n)
 	for mime, link := range file.ExportLinks {
 		if ext := mimeToExt[mime]; ext != "" {
