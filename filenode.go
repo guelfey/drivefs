@@ -22,7 +22,7 @@ type fileNode struct {
 	size     uint64
 	toDelete bool
 	fuse.DefaultFsNode
-	sync.Mutex
+	sync.RWMutex
 }
 
 func newFileNode(file *driveFile) *fileNode {
@@ -58,8 +58,8 @@ func newFileNode(file *driveFile) *fileNode {
 }
 
 func (n *fileNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context) fuse.Status {
-	n.Lock()
-	defer n.Unlock()
+	n.RLock()
+	defer n.RUnlock()
 	if n == nil {
 		return fuse.ENOENT
 	}
@@ -104,7 +104,7 @@ func (n *fileNode) Open(flags uint32, context *fuse.Context) (fuse.File, fuse.St
 	return f, fuse.OK
 }
 
-// n must already be locked
+// n must already be locked for writing
 func (n *fileNode) setAtime(t time.Time) error {
 	n.atime = t
 	f := &drive.File{LastViewedByMeDate: t.Format(time.RFC3339Nano)}

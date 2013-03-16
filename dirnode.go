@@ -17,7 +17,7 @@ type dirNode struct {
 	mtime   time.Time
 	name    string
 	fuse.DefaultFsNode
-	sync.Mutex
+	sync.RWMutex
 }
 
 func newDirNode(file *driveFile) *dirNode {
@@ -82,6 +82,8 @@ func (n *dirNode) attachChildren(l *list.List) {
 }
 
 func (n *dirNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context) fuse.Status {
+	n.RLock()
+	defer n.RUnlock()
 	if n == nil {
 		return fuse.ENOENT
 	}
@@ -142,7 +144,7 @@ func (n *dirNode) Rmdir(name string, context *fuse.Context) fuse.Status {
 	return fuse.OK
 }
 
-// n must already be locked
+// n must already be locked for writing
 func (n *dirNode) setAtime(t time.Time) error {
 	n.atime = t
 	f := &drive.File{LastViewedByMeDate: t.Format(time.RFC3339Nano)}

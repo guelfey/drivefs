@@ -45,8 +45,8 @@ func (n *docNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context)
 	}
 	n.Lock()
 	defer n.Unlock()
-	n.dir.Lock()
-	defer n.dir.Unlock()
+	n.dir.RLock()
+	defer n.dir.RUnlock()
 	if !n.hasSize {
 		resp, err := transport.Client().Head(n.dlurl)
 		if err != nil {
@@ -151,7 +151,7 @@ type docDirNode struct {
 	mtime time.Time
 	name  string
 	fuse.DefaultFsNode
-	sync.Mutex
+	sync.RWMutex
 }
 
 func newDocDirNode(file *driveFile) *docDirNode {
@@ -196,8 +196,8 @@ func (n *docDirNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Conte
 	if n == nil {
 		return fuse.ENOENT
 	}
-	n.Lock()
-	defer n.Unlock()
+	n.RLock()
+	defer n.RUnlock()
 	out.Atime = uint64(n.atime.Unix())
 	out.Mtime = uint64(n.mtime.Unix())
 	out.Owner.Uid = uint32(os.Getuid())
@@ -210,7 +210,7 @@ func (n *docDirNode) Name() string {
 	return n.name
 }
 
-// n must already be locked
+// n must already be locked for writing
 func (n *docDirNode) setAtime(t time.Time) error {
 	n.atime = t
 	f := &drive.File{LastViewedByMeDate: t.Format(time.RFC3339Nano)}
