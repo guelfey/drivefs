@@ -1,6 +1,7 @@
 package main
 
 import (
+	"code.google.com/p/google-api-go-client/drive/v2"
 	"container/list"
 	"github.com/hanwen/go-fuse/fuse"
 	"log"
@@ -10,26 +11,42 @@ import (
 )
 
 type dirNode struct {
+	atime   time.Time
 	id      string
 	mode    uint32
-	modTime time.Time
+	mtime   time.Time
 	name    string
 	fuse.DefaultFsNode
 	sync.Mutex
 }
 
 func newDirNode(file *driveFile) *dirNode {
-	t, err := time.Parse(time.RFC3339, file.ModifiedDate)
-	if err != nil {
-		t = time.Unix(0, 0)
-		log.Println(file.Title, err)
-	}
-	mode := uint32(fuse.S_IFDIR | 0500)
-	if file.Editable {
-		mode |= 0200
-	}
-	n := &dirNode{id: file.Id, modTime: t, mode: mode, name: file.Title}
+	var err error
+
+	n := new(dirNode)
 	_ = fs.root.Inode().New(true, n)
+	n.id = file.Id
+	n.name = file.Title
+	n.mtime, err = time.Parse(time.RFC3339, file.ModifiedDate)
+	if err != nil {
+		n.mtime = time.Unix(0, 0)
+		log.Println(n.name, err)
+	}
+	n.mode = uint32(fuse.S_IFDIR | 0500)
+	if file.Editable {
+		n.mode |= 0200
+	}
+	var t string
+	if file.LastViewedByMeDate == "" {
+		t = file.CreatedDate
+	} else {
+		t = file.LastViewedByMeDate
+	}
+	n.atime, err = time.Parse(time.RFC3339Nano, t)
+	if err != nil {
+		n.atime = time.Unix(0, 0)
+		log.Println(n.name, err)
+	}
 	return n
 }
 
@@ -68,7 +85,8 @@ func (n *dirNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context)
 	if n == nil {
 		return fuse.ENOENT
 	}
-	out.Mtime = uint64(n.modTime.Unix())
+	out.Atime = uint64(n.atime.Unix())
+	out.Mtime = uint64(n.mtime.Unix())
 	out.Owner.Uid = fs.uid
 	out.Owner.Gid = fs.gid
 	out.Mode = n.mode
@@ -120,7 +138,16 @@ func (n *dirNode) Rmdir(name string, context *fuse.Context) fuse.Status {
 	default:
 		return fuse.EINVAL
 	}
+	n.setAtime(time.Now())
 	return fuse.OK
+}
+
+// n must already be locked
+func (n *dirNode) setAtime(t time.Time) error {
+	n.atime = t
+	f := &drive.File{LastViewedByMeDate: t.Format(time.RFC3339Nano)}
+	_, err := srv.Files.Patch(n.id, f).UpdateViewedDate(false).Do()
+	return err
 }
 
 func (n *dirNode) Unlink(name string, context *fuse.Context) fuse.Status {
@@ -158,5 +185,6 @@ func (n *dirNode) Unlink(name string, context *fuse.Context) fuse.Status {
 		}
 		n.Inode().RmChild(name)
 	}
+	n.setAtime(time.Now())
 	return fuse.OK
 }

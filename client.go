@@ -14,19 +14,21 @@ type driveFileList struct {
 // We define our own type because the one from google-api-go-client is bugged
 // (exportLinks is an empty struct).
 type driveFile struct {
-	DownloadUrl  string
-	Editable     bool
-	ExportLinks  map[string]string
-	FileSize     int64 `json:",string"`
-	Id           string
-	MimeType     string
-	ModifiedDate string
-	Parents      []drive.ParentReference
-	Title        string
+	CreatedDate        string
+	DownloadUrl        string
+	Editable           bool
+	ExportLinks        map[string]string
+	FileSize           int64 `json:",string"`
+	Id                 string
+	LastViewedByMeDate string
+	MimeType           string
+	ModifiedDate       string
+	Parents            []drive.ParentReference
+	Title              string
 }
 
 func getRoot() (root *driveFile, err error) {
-	const url = "https://www.googleapis.com/drive/v2/files/root?fields=editable%2Cid%2Ctitle%2CmodifiedDate"
+	const url = "https://www.googleapis.com/drive/v2/files/root?fields=createdDate%2Ceditable%2Cid%2ClastViewedByMeDate%2CmodifiedDate%2Ctitle"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return
@@ -46,7 +48,7 @@ func getRoot() (root *driveFile, err error) {
 }
 
 func listFiles() (list driveFileList, err error) {
-	const url = "https://www.googleapis.com/drive/v2/files?maxResults=2147483647&fields=items(downloadUrl%2Ceditable%2CexportLinks%2CfileSize%2Cid%2CmimeType%2CmodifiedDate%2Cparents%2Ctitle)"
+	const url = "https://www.googleapis.com/drive/v2/files?maxResults=2147483647&fields=items(createdDate%2CdownloadUrl%2Ceditable%2CexportLinks%2CfileSize%2Cid%2ClastViewedByMeDate%2CmimeType%2CmodifiedDate%2Cparents%2Ctitle)"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return

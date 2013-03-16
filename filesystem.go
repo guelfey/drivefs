@@ -22,9 +22,10 @@ func (fs *Filesystem) OnMount(conn *fuse.FileSystemConnector) {
 		log.Fatal("Failed to list files:", err)
 	}
 	root := newDirNode(rootFile)
+	fs.root.atime = root.atime
 	fs.root.id = root.id
 	fs.root.mode = root.mode
-	fs.root.modTime = root.modTime
+	fs.root.mtime = root.mtime
 	fs.root.name = root.name
 	fs.root.attachChildren(toList(list))
 }

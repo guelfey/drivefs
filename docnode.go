@@ -1,6 +1,7 @@
 package main
 
 import (
+	"code.google.com/p/google-api-go-client/drive/v2"
 	"github.com/hanwen/go-fuse/fuse"
 	"io"
 	"log"
@@ -26,10 +27,10 @@ var mimeToExt = map[string]string{
 
 type docNode struct {
 	data     []byte
+	dir      *docDirNode
 	dlurl    string
 	hasSize  bool
 	mode     uint32
-	modTime  time.Time
 	name     string
 	size     uint64
 	reader   io.ReadCloser
@@ -39,11 +40,13 @@ type docNode struct {
 }
 
 func (n *docNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context) fuse.Status {
-	n.Lock()
-	defer n.Unlock()
 	if n == nil {
 		return fuse.ENOENT
 	}
+	n.Lock()
+	defer n.Unlock()
+	n.dir.Lock()
+	defer n.dir.Unlock()
 	if !n.hasSize {
 		resp, err := transport.Client().Head(n.dlurl)
 		if err != nil {
@@ -54,7 +57,8 @@ func (n *docNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context)
 		n.size = uint64(resp.ContentLength)
 		n.hasSize = true
 	}
-	out.Mtime = uint64(n.modTime.Unix())
+	out.Atime = uint64(n.dir.atime.Unix())
+	out.Mtime = uint64(n.dir.mtime.Unix())
 	out.Owner.Uid = fs.uid
 	out.Owner.Gid = fs.gid
 	out.Mode = n.mode
@@ -65,6 +69,8 @@ func (n *docNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context)
 func (n *docNode) Open(flags uint32, context *fuse.Context) (fuse.File, fuse.Status) {
 	n.Lock()
 	defer n.Unlock()
+	n.dir.Lock()
+	defer n.dir.Unlock()
 	if context.Uid != fs.uid || flags&fuse.O_ANYWRITE != 0 {
 		return nil, fuse.EPERM
 	}
@@ -82,6 +88,7 @@ func (n *docNode) Open(flags uint32, context *fuse.Context) (fuse.File, fuse.Sta
 	if n.data == nil {
 		n.data = make([]byte, 0)
 	}
+	n.dir.setAtime(time.Now())
 	return f, fuse.OK
 }
 
@@ -138,28 +145,46 @@ func (f *docFile) Release() {
 }
 
 type docDirNode struct {
-	id      string
-	mode    uint32
-	modTime time.Time
-	name    string
+	atime time.Time
+	id    string
+	mode  uint32
+	mtime time.Time
+	name  string
 	fuse.DefaultFsNode
+	sync.Mutex
 }
 
 func newDocDirNode(file *driveFile) *docDirNode {
-	t, err := time.Parse(time.RFC3339, file.ModifiedDate)
-	if err != nil {
-		t = time.Unix(0, 0)
-		log.Println(file.Title, err)
-	}
-	n := &docDirNode{id: file.Id, modTime: t, mode: fuse.S_IFDIR | 0500, name: file.Title}
+	var err error
+
+	n := new(docDirNode)
+	_ = fs.root.Inode().New(true, n)
+	n.id = file.Id
+	n.mode = fuse.S_IFDIR | 0500
 	if file.Editable {
 		n.mode |= 0200
 	}
-	_ = fs.root.Inode().New(true, n)
+	n.mtime, err = time.Parse(time.RFC3339, file.ModifiedDate)
+	if err != nil {
+		n.mtime = time.Unix(0, 0)
+		log.Println(file.Title, err)
+	}
+	n.name = file.Title
+	var t string
+	if file.LastViewedByMeDate == "" {
+		t = file.CreatedDate
+	} else {
+		t = file.LastViewedByMeDate
+	}
+	n.atime, err = time.Parse(time.RFC3339Nano, t)
+	if err != nil {
+		n.atime = time.Unix(0, 0)
+		log.Println(n.name, err)
+	}
 	for mime, link := range file.ExportLinks {
 		if ext := mimeToExt[mime]; ext != "" {
-			c := &docNode{dlurl: link, mode: fuse.S_IFREG | 0400,
-				modTime: n.modTime, name: n.name + ext}
+			c := &docNode{dir: n, dlurl: link, mode: fuse.S_IFREG | 0400,
+				name: n.name + ext}
 			_ = fs.root.Inode().New(false, c)
 			n.Inode().AddChild(n.name+ext, c.Inode())
 		}
@@ -171,7 +196,10 @@ func (n *docDirNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Conte
 	if n == nil {
 		return fuse.ENOENT
 	}
-	out.Mtime = uint64(n.modTime.Unix())
+	n.Lock()
+	defer n.Unlock()
+	out.Atime = uint64(n.atime.Unix())
+	out.Mtime = uint64(n.mtime.Unix())
 	out.Owner.Uid = uint32(os.Getuid())
 	out.Owner.Gid = uint32(os.Getgid())
 	out.Mode = n.mode
@@ -180,4 +208,12 @@ func (n *docDirNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Conte
 
 func (n *docDirNode) Name() string {
 	return n.name
+}
+
+// n must already be locked
+func (n *docDirNode) setAtime(t time.Time) error {
+	n.atime = t
+	f := &drive.File{LastViewedByMeDate: t.Format(time.RFC3339Nano)}
+	_, err := srv.Files.Patch(n.id, f).UpdateViewedDate(false).Do()
+	return err
 }

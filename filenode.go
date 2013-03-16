@@ -1,6 +1,7 @@
 package main
 
 import (
+	"code.google.com/p/google-api-go-client/drive/v2"
 	"github.com/hanwen/go-fuse/fuse"
 	"io"
 	"log"
@@ -9,10 +10,11 @@ import (
 )
 
 type fileNode struct {
+	atime    time.Time
 	data     []byte
 	dlurl    string
 	mode     uint32
-	modTime  time.Time
+	mtime    time.Time
 	name     string
 	id       string
 	reader   io.ReadCloser
@@ -36,9 +38,20 @@ func newFileNode(file *driveFile) *fileNode {
 		n.mode |= 0200
 	}
 	n.dlurl = file.DownloadUrl
-	n.modTime, err = time.Parse(time.RFC3339, file.ModifiedDate)
+	n.mtime, err = time.Parse(time.RFC3339Nano, file.ModifiedDate)
 	if err != nil {
-		n.modTime = time.Unix(0, 0)
+		n.mtime = time.Unix(0, 0)
+		log.Println(n.name, err)
+	}
+	var t string
+	if file.LastViewedByMeDate == "" {
+		t = file.CreatedDate
+	} else {
+		t = file.LastViewedByMeDate
+	}
+	n.atime, err = time.Parse(time.RFC3339Nano, t)
+	if err != nil {
+		n.atime = time.Unix(0, 0)
 		log.Println(n.name, err)
 	}
 	return n
@@ -51,7 +64,8 @@ func (n *fileNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context
 		return fuse.ENOENT
 	}
 	out.Size = n.size
-	out.Mtime = uint64(n.modTime.Unix())
+	out.Mtime = uint64(n.mtime.Unix())
+	out.Atime = uint64(n.atime.Unix())
 	out.Owner.Uid = fs.uid
 	out.Owner.Gid = fs.gid
 	out.Mode = n.mode
@@ -82,7 +96,20 @@ func (n *fileNode) Open(flags uint32, context *fuse.Context) (fuse.File, fuse.St
 	if n.data == nil {
 		n.data = make([]byte, 0)
 	}
+	err := n.setAtime(time.Now())
+	if err != nil {
+		log.Print(err)
+		return nil, fuse.EIO
+	}
 	return f, fuse.OK
+}
+
+// n must already be locked
+func (n *fileNode) setAtime(t time.Time) error {
+	n.atime = t
+	f := &drive.File{LastViewedByMeDate: t.Format(time.RFC3339Nano)}
+	_, err := srv.Files.Patch(n.id, f).UpdateViewedDate(false).Do()
+	return err
 }
 
 type file struct {
