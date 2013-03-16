@@ -88,7 +88,6 @@ func connect() {
 	if err != nil {
 		log.Fatalln("Failed to create drive service:", err)
 	}
-	transport.Refresh()
 }
 
 func getToken() {
