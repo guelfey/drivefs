@@ -215,10 +215,10 @@ func (n *docDirNode) Name() string {
 func (n *docDirNode) Utimens(file fuse.File, atimens, mtimens int64, context *fuse.Context) fuse.Status {
 	var atime, mtime time.Time
 	if atimens > 0 {
-		atime = time.Unix(atimens / 1e9, atimens % 1e9)
+		atime = time.Unix(atimens/1e9, atimens%1e9)
 	}
 	if mtimens > 0 {
-		mtime = time.Unix(mtimens / 1e9, mtimens % 1e9)
+		mtime = time.Unix(mtimens/1e9, mtimens%1e9)
 	}
 	n.Lock()
 	err := n.setTimes(atime, mtime)
