@@ -171,7 +171,7 @@ with `fusermount -u MOUNTPOINT`.
 		<td>Utimens</td>
 		<td>Yes</td>
 		<td>Yes</td>
-		<td>Yes<td>
+		<td>Yes</td>
 		<td>Yes</td>
 	</tr>
 	<tr>
