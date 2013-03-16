@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"github.com/hanwen/go-fuse/fuse"
 	"log"
+	"net/http"
+	"net/http/httputil"
 	"os"
 	"os/signal"
 	"path"
@@ -28,10 +30,36 @@ var (
 )
 
 var (
-	debug     = flag.Bool("debug", false, "print FUSE debugging output")
+	debugApi  = flag.Bool("debug-api", false, "print Drive API debugging output")
+	debugFuse = flag.Bool("debug-fuse", false, "print FUSE debugging output")
 	doInit    = flag.Bool("init", false, "retrieve a new token")
 	tokenFile = flag.String("tokenfile", getTokenFile(), "path to the token file")
 )
+
+type debugTransport struct {
+	tr http.RoundTripper
+}
+
+func (d debugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	buf, err := httputil.DumpRequest(req, true)
+	if err != nil {
+		log.Println("failed to dump request:", err)
+	} else {
+		log.Printf("sending request: %s\n", buf)
+	}
+	resp, err := d.tr.RoundTrip(req)
+	if err != nil {
+		log.Println("got error:", err)
+	} else {
+		buf, err = httputil.DumpResponse(resp, true)
+		if err != nil {
+			log.Println("failed to dump response", err)
+		} else {
+			log.Printf("got response: %s\n", buf)
+		}
+	}
+	return resp, err
+}
 
 func getTokenFile() string {
 	dataHome := os.Getenv("XDG_DATA_HOME")
@@ -95,6 +123,9 @@ func main() {
 	transport.Config = oauthConf
 	flag.Usage = usage
 	flag.Parse()
+	if *debugApi {
+		transport.Transport = debugTransport{http.DefaultTransport}
+	}
 	if *doInit {
 		getToken()
 		return
@@ -120,6 +151,6 @@ func main() {
 			ms.Unmount()
 		}
 	}()
-	ms.Debug = *debug
+	ms.Debug = *debugFuse
 	ms.Loop()
 }
