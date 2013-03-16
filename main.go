@@ -106,7 +106,9 @@ func main() {
 	fs.root = &dirNode{}
 	fs.uid = uint32(os.Getuid())
 	fs.gid = uint32(os.Getgid())
-	state, _, err := fuse.MountNodeFileSystem(flag.Arg(0), &fs, nil)
+	fsc := fuse.NewFileSystemConnector(&fs, nil)
+	ms := fuse.NewMountState(fsc)
+	err := ms.Mount(flag.Arg(0), &fuse.MountOptions{Name: "drivefs"})
 	if err != nil {
 		log.Fatalln("Failed to mount file system:", err)
 	}
@@ -115,9 +117,9 @@ func main() {
 	go func() {
 		for {
 			<-c
-			state.Unmount()
+			ms.Unmount()
 		}
 	}()
-	state.Debug = *debug
-	state.Loop()
+	ms.Debug = *debug
+	ms.Loop()
 }
