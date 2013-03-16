@@ -64,8 +64,7 @@ func (n *fileNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context
 		return fuse.ENOENT
 	}
 	out.Size = n.size
-	out.Mtime = uint64(n.mtime.Unix())
-	out.Atime = uint64(n.atime.Unix())
+	out.SetTimes(&n.atime, &n.mtime, nil)
 	out.Owner.Uid = fs.uid
 	out.Owner.Gid = fs.gid
 	out.Mode = n.mode
@@ -96,7 +95,7 @@ func (n *fileNode) Open(flags uint32, context *fuse.Context) (fuse.File, fuse.St
 	if n.data == nil {
 		n.data = make([]byte, 0)
 	}
-	err := n.setAtime(time.Now())
+	err := n.setTimes(time.Now(), time.Time{})
 	if err != nil {
 		log.Print(err)
 		return nil, fuse.EIO
@@ -104,11 +103,39 @@ func (n *fileNode) Open(flags uint32, context *fuse.Context) (fuse.File, fuse.St
 	return f, fuse.OK
 }
 
+func (n *fileNode) Utimens(file fuse.File, atimens, mtimens int64, context *fuse.Context) fuse.Status {
+	var atime, mtime time.Time
+	if atimens > 0 {
+		atime = time.Unix(atimens / 1e9, atimens % 1e9)
+	}
+	if mtimens > 0 {
+		mtime = time.Unix(mtimens / 1e9, mtimens % 1e9)
+	}
+	n.Lock()
+	err := n.setTimes(atime, mtime)
+	n.Unlock()
+	if err != nil {
+		log.Print(err)
+		return fuse.EIO
+	}
+	return fuse.OK
+}
+
 // n must already be locked for writing
-func (n *fileNode) setAtime(t time.Time) error {
-	n.atime = t
-	f := &drive.File{LastViewedByMeDate: t.Format(time.RFC3339Nano)}
-	_, err := srv.Files.Patch(n.id, f).UpdateViewedDate(false).Do()
+func (n *fileNode) setTimes(atime, mtime time.Time) error {
+	if atime.IsZero() && mtime.IsZero() {
+		return nil
+	}
+	f := new(drive.File)
+	if !atime.IsZero() {
+		n.atime = atime
+		f.LastViewedByMeDate = atime.Format(time.RFC3339Nano)
+	}
+	if !mtime.IsZero() {
+		n.mtime = mtime
+		f.ModifiedDate = mtime.Format(time.RFC3339Nano)
+	}
+	_, err := srv.Files.Patch(n.id, f).UpdateViewedDate(false).SetModifiedDate(true).Do()
 	return err
 }
 

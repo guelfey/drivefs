@@ -169,10 +169,10 @@ with `fusermount -u MOUNTPOINT`.
 	</tr>
 	<tr>
 		<td>Utimens</td>
-		<td>No</td>
-		<td>No</td>
-		<td>No</td>
-		<td>No</td>
+		<td>Yes</td>
+		<td>Yes</td>
+		<td>Yes<td>
+		<td>Yes</td>
 	</tr>
 	<tr>
 		<td>Write</td>

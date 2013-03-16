@@ -57,8 +57,7 @@ func (n *docNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context)
 		n.size = uint64(resp.ContentLength)
 		n.hasSize = true
 	}
-	out.Atime = uint64(n.dir.atime.Unix())
-	out.Mtime = uint64(n.dir.mtime.Unix())
+	out.SetTimes(&n.dir.atime, &n.dir.mtime, nil)
 	out.Owner.Uid = fs.uid
 	out.Owner.Gid = fs.gid
 	out.Mode = n.mode
@@ -88,8 +87,12 @@ func (n *docNode) Open(flags uint32, context *fuse.Context) (fuse.File, fuse.Sta
 	if n.data == nil {
 		n.data = make([]byte, 0)
 	}
-	n.dir.setAtime(time.Now())
+	n.dir.setTimes(time.Now(), time.Time{})
 	return f, fuse.OK
+}
+
+func (f *docNode) Utimens(file fuse.File, atimens, mtimens int64, context *fuse.Context) fuse.Status {
+	return f.dir.Utimens(file, atimens, mtimens, context)
 }
 
 type docFile struct {
@@ -198,8 +201,7 @@ func (n *docDirNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Conte
 	}
 	n.RLock()
 	defer n.RUnlock()
-	out.Atime = uint64(n.atime.Unix())
-	out.Mtime = uint64(n.mtime.Unix())
+	out.SetTimes(&n.atime, &n.mtime, nil)
 	out.Owner.Uid = uint32(os.Getuid())
 	out.Owner.Gid = uint32(os.Getgid())
 	out.Mode = n.mode
@@ -210,10 +212,38 @@ func (n *docDirNode) Name() string {
 	return n.name
 }
 
+func (n *docDirNode) Utimens(file fuse.File, atimens, mtimens int64, context *fuse.Context) fuse.Status {
+	var atime, mtime time.Time
+	if atimens > 0 {
+		atime = time.Unix(atimens / 1e9, atimens % 1e9)
+	}
+	if mtimens > 0 {
+		mtime = time.Unix(mtimens / 1e9, mtimens % 1e9)
+	}
+	n.Lock()
+	err := n.setTimes(atime, mtime)
+	n.Unlock()
+	if err != nil {
+		log.Print(err)
+		return fuse.EIO
+	}
+	return fuse.OK
+}
+
 // n must already be locked for writing
-func (n *docDirNode) setAtime(t time.Time) error {
-	n.atime = t
-	f := &drive.File{LastViewedByMeDate: t.Format(time.RFC3339Nano)}
-	_, err := srv.Files.Patch(n.id, f).UpdateViewedDate(false).Do()
+func (n *docDirNode) setTimes(atime, mtime time.Time) error {
+	if atime.IsZero() && mtime.IsZero() {
+		return nil
+	}
+	f := new(drive.File)
+	if !atime.IsZero() {
+		n.atime = atime
+		f.LastViewedByMeDate = atime.Format(time.RFC3339Nano)
+	}
+	if !mtime.IsZero() {
+		n.mtime = mtime
+		f.ModifiedDate = mtime.Format(time.RFC3339Nano)
+	}
+	_, err := srv.Files.Patch(n.id, f).UpdateViewedDate(false).SetModifiedDate(true).Do()
 	return err
 }
