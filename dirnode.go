@@ -2,7 +2,6 @@ package main
 
 import (
 	"code.google.com/p/google-api-go-client/drive/v2"
-	"container/list"
 	"github.com/hanwen/go-fuse/fuse"
 	"log"
 	"sync"
@@ -48,37 +47,6 @@ func newDirNode(file *driveFile) *dirNode {
 		log.Println(n.name, err)
 	}
 	return n
-}
-
-func (n *dirNode) attachChildren(l *list.List) {
-	for e := l.Front(); e != nil; {
-		var attached bool
-
-		v := e.Value.(driveFile)
-		for _, p := range v.Parents {
-			if p.Id == n.id {
-				attached = true
-				m := newNode(&v)
-				n.Inode().AddChild(m.Name(), m.Inode())
-				prev := e.Prev()
-				l.Remove(e)
-				if prev == nil {
-					e = l.Front()
-				} else {
-					e = prev.Next()
-				}
-				break
-			}
-		}
-		if !attached {
-			e = e.Next()
-		}
-	}
-	for _, v := range n.Inode().FsChildren() {
-		if n, ok := v.FsNode().(*dirNode); ok {
-			n.attachChildren(l)
-		}
-	}
 }
 
 func (n *dirNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context) fuse.Status {

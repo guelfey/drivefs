@@ -1,15 +1,15 @@
 package main
 
 import (
-	"container/list"
 	"github.com/hanwen/go-fuse/fuse"
 	"log"
 )
 
 type Filesystem struct {
-	root *dirNode
-	uid  uint32
-	gid  uint32
+	root     *dirNode
+	uid      uint32
+	gid      uint32
+	idToNode map[string]Node
 }
 
 func (fs *Filesystem) OnMount(conn *fuse.FileSystemConnector) {
@@ -27,7 +27,23 @@ func (fs *Filesystem) OnMount(conn *fuse.FileSystemConnector) {
 	fs.root.mode = root.mode
 	fs.root.mtime = root.mtime
 	fs.root.name = root.name
-	fs.root.attachChildren(toList(list))
+	fs.idToNode = make(map[string]Node)
+	fs.idToNode[fs.root.id] = fs.root
+	for _, v := range list.Items {
+		n := newNode(&v)
+		fs.idToNode[v.Id] = n
+	}
+	for _, v := range list.Items {
+		n := fs.idToNode[v.Id]
+		// TODO what to do with files having no parents (trash etc.)?
+		for _, p := range v.Parents {
+			parent, _ := fs.idToNode[p.Id].(*dirNode)
+			if parent == nil {
+				continue
+			}
+			parent.Inode().AddChild(n.Name(), n.Inode())
+		}
+	}
 }
 
 func (fs *Filesystem) OnUnmount() {
@@ -57,14 +73,6 @@ func newNode(f *driveFile) (node Node) {
 		node = newDocDirNode(f)
 	default:
 		node = newFileNode(f)
-	}
-	return
-}
-
-func toList(files driveFileList) (l *list.List) {
-	l = list.New()
-	for _, v := range files.Items {
-		l.PushBack(v)
 	}
 	return
 }
