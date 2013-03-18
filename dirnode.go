@@ -107,22 +107,23 @@ func (n *dirNode) Rmdir(name string, context *fuse.Context) fuse.Status {
 	default:
 		return fuse.EINVAL
 	}
-	n.setTimes(time.Now(), time.Now())
+	t := time.Now()
+	n.setTimes(&t, &t)
 	return fuse.OK
 }
 
 // n must already be locked for writing
-func (n *dirNode) setTimes(atime, mtime time.Time) error {
+func (n *dirNode) setTimes(atime, mtime *time.Time) error {
 	if atime.IsZero() && mtime.IsZero() {
 		return nil
 	}
 	f := new(drive.File)
-	if !atime.IsZero() {
-		n.atime = atime
+	if atime != nil {
+		n.atime = *atime
 		f.LastViewedByMeDate = atime.Format(time.RFC3339Nano)
 	}
-	if !mtime.IsZero() {
-		n.mtime = mtime
+	if mtime != nil {
+		n.mtime = *mtime
 		f.ModifiedDate = mtime.Format(time.RFC3339Nano)
 	}
 	_, err := srv.Files.Patch(n.id, f).UpdateViewedDate(false).SetModifiedDate(true).Do()
@@ -164,18 +165,12 @@ func (n *dirNode) Unlink(name string, context *fuse.Context) fuse.Status {
 		}
 		n.Inode().RmChild(name)
 	}
-	n.setTimes(time.Now(), time.Now())
+	t := time.Now()
+	n.setTimes(&t, &t)
 	return fuse.OK
 }
 
-func (n *dirNode) Utimens(file fuse.File, atimens, mtimens int64, context *fuse.Context) fuse.Status {
-	var atime, mtime time.Time
-	if atimens > 0 {
-		atime = time.Unix(atimens/1e9, atimens%1e9)
-	}
-	if mtimens > 0 {
-		mtime = time.Unix(mtimens/1e9, mtimens%1e9)
-	}
+func (n *dirNode) Utimens(file fuse.File, atime, mtime *time.Time, context *fuse.Context) fuse.Status {
 	n.Lock()
 	err := n.setTimes(atime, mtime)
 	n.Unlock()
