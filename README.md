@@ -188,7 +188,6 @@ with `fusermount -u MOUNTPOINT`.
 * Implement missing FUSE methods (see above).
 	* Figure out how to represent permissions.
 * Handle files with same name somehow.
-* Handle files with multiple parents (represent as hard links?).
 * Make read buffering smarter.
 * Moar performance!
 	* Use gzip for some calls?

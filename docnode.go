@@ -151,6 +151,7 @@ func (f *docFile) Release() {
 type docDirNode struct {
 	atime time.Time
 	id    string
+	ino   uint64
 	mode  uint32
 	mtime time.Time
 	name  string
@@ -158,12 +159,13 @@ type docDirNode struct {
 	sync.RWMutex
 }
 
-func newDocDirNode(file *driveFile) *docDirNode {
+func newDocDirNode(file *driveFile, ino uint64) *docDirNode {
 	var err error
 
 	n := new(docDirNode)
 	_ = fs.root.Inode().New(true, n)
 	n.id = file.Id
+	n.ino = ino
 	n.mode = fuse.S_IFDIR | 0500
 	if file.Editable {
 		n.mode |= 0200
@@ -202,6 +204,7 @@ func (n *docDirNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Conte
 	}
 	n.RLock()
 	defer n.RUnlock()
+	out.Ino = n.ino
 	out.SetTimes(&n.atime, &n.mtime, nil)
 	out.Owner.Uid = uint32(os.Getuid())
 	out.Owner.Gid = uint32(os.Getgid())

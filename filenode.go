@@ -16,7 +16,9 @@ type fileNode struct {
 	mode     uint32
 	mtime    time.Time
 	name     string
+	nlink    int
 	id       string
+	ino      uint64
 	reader   io.ReadCloser
 	refcount int
 	size     uint64
@@ -25,12 +27,13 @@ type fileNode struct {
 	sync.RWMutex
 }
 
-func newFileNode(file *driveFile) *fileNode {
+func newFileNode(file *driveFile, ino uint64) *fileNode {
 	var err error
 
 	n := new(fileNode)
 	_ = fs.root.Inode().New(false, n)
 	n.id = file.Id
+	n.ino = ino
 	n.name = file.Title
 	n.size = uint64(file.FileSize)
 	n.mode = fuse.S_IFREG | 0400
@@ -63,6 +66,7 @@ func (n *fileNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context
 	if n == nil {
 		return fuse.ENOENT
 	}
+	out.Ino = n.ino
 	out.Size = n.size
 	out.SetTimes(&n.atime, &n.mtime, nil)
 	out.Owner.Uid = fs.uid

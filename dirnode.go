@@ -12,6 +12,7 @@ import (
 type dirNode struct {
 	atime time.Time
 	id    string
+	ino   uint64
 	mode  uint32
 	mtime time.Time
 	name  string
@@ -19,12 +20,13 @@ type dirNode struct {
 	sync.RWMutex
 }
 
-func newDirNode(file *driveFile) *dirNode {
+func newDirNode(file *driveFile, ino uint64) *dirNode {
 	var err error
 
 	n := new(dirNode)
 	_ = fs.root.Inode().New(true, n)
 	n.id = file.Id
+	n.ino = ino
 	n.name = file.Title
 	n.mtime, err = time.Parse(time.RFC3339, file.ModifiedDate)
 	if err != nil {
@@ -55,6 +57,7 @@ func (n *dirNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context)
 	if n == nil {
 		return fuse.ENOENT
 	}
+	out.Ino = n.ino
 	out.SetTimes(&n.atime, &n.mtime, nil)
 	out.Owner.Uid = fs.uid
 	out.Owner.Gid = fs.gid
@@ -72,7 +75,7 @@ func (n *dirNode) Rmdir(name string, context *fuse.Context) fuse.Status {
 	if context.Uid != fs.uid || n.mode&0200 == 0 {
 		return fuse.EACCES
 	}
-	cinode := n.Inode().Children()[name]
+	cinode := n.Inode().GetChild(name)
 	if cinode == nil {
 		return fuse.ENOENT
 	}
@@ -136,7 +139,7 @@ func (n *dirNode) Unlink(name string, context *fuse.Context) fuse.Status {
 	if context.Uid != fs.uid || n.mode&0200 == 0 {
 		return fuse.EACCES
 	}
-	cinode := n.Inode().Children()[name]
+	cinode := n.Inode().GetChild(name)
 	if cinode == nil {
 		return fuse.ENOENT
 	}
@@ -154,14 +157,23 @@ func (n *dirNode) Unlink(name string, context *fuse.Context) fuse.Status {
 		}
 		child.Lock()
 		defer child.Unlock()
-		if child.refcount == 0 {
-			err := srv.Files.Delete(child.id).Do()
+		if child.nlink == 1 {
+			if child.refcount == 0 {
+				err := srv.Files.Delete(child.id).Do()
+				if err != nil {
+					log.Print(err)
+					return fuse.EIO
+				}
+			} else {
+				child.toDelete = true
+			}
+		} else {
+			err := srv.Children.Delete(n.id, child.id).Do()
 			if err != nil {
 				log.Print(err)
 				return fuse.EIO
 			}
-		} else {
-			child.toDelete = true
+			child.nlink--
 		}
 		n.Inode().RmChild(name)
 	}
