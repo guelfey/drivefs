@@ -65,6 +65,40 @@ func (n *dirNode) GetAttr(out *fuse.Attr, file fuse.File, context *fuse.Context)
 	return fuse.OK
 }
 
+func (n *dirNode) Link(name string, existing fuse.FsNode, context *fuse.Context) (fuse.FsNode, fuse.Status) {
+	n.Lock()
+	defer n.Unlock()
+	if context.Uid != fs.uid || n.mode&0200 == 0 {
+		return nil, fuse.EACCES
+	}
+	cinode := n.Inode().GetChild(name)
+	if cinode != nil {
+		return nil, fuse.Status(syscall.EEXIST)
+	}
+	switch old := existing.(type) {
+	case (*dirNode):
+		return nil, fuse.EPERM
+	case (*docDirNode):
+		return nil, fuse.EPERM
+	case (*docNode):
+		return nil, fuse.EPERM
+	case (*fileNode):
+		old.Lock()
+		defer old.Unlock()
+		if name != old.name {
+			return nil, fuse.EINVAL
+		}
+		_, err := srv.Children.Insert(n.id, &drive.ChildReference{Id: old.id}).Do()
+		if err != nil {
+			log.Print(err)
+			return nil, fuse.EIO
+		}
+		old.nlink++
+		n.Inode().AddChild(name, old.Inode())
+	}
+	return existing, fuse.OK
+}
+
 func (n *dirNode) Name() string {
 	return n.name
 }

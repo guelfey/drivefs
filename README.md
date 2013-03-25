@@ -64,7 +64,7 @@ with `fusermount -u MOUNTPOINT`.
 	</tr>
 	<tr>
 		<td>Link</td>
-		<td>No</td>
+		<td>Yes</td>
 		<td>-</td>
 		<td>-</td>
 		<td>-</td>
